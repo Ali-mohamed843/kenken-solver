@@ -1,4 +1,3 @@
-"""Shared KenKen puzzle utilities. Uses only the Python standard library."""
 from __future__ import annotations
 import json, time
 from pathlib import Path
@@ -26,8 +25,6 @@ SAMPLE_PUZZLES = {
         {"op": "=", "target": 6, "cells": [(5,0)]}, {"op": "-", "target": 2, "cells": [(5,1),(5,2)]}, {"op": "-", "target": 1, "cells": [(5,3),(5,4)]}, {"op": "=", "target": 5, "cells": [(5,5)]}]}
 }
 
-# Use valid cyclic Latin-square examples. Pair adjacent cells into sum cages;
-# leave the final cell of odd-width rows as a single-cell cage.
 def _make_sample(n):
     cages=[]
     for r in range(n):
@@ -127,11 +124,10 @@ import random
 OPS = {"+": "+", "-": "-", "*": "×", "/": "÷", "=": ""}
 
 
-# ============================ Puzzle model ============================
 class Cage:
     def __init__(self, cells, op, target):
-        self.cells = list(cells)          # [(r, c), ...]
-        self.op = op                      # one of + - * / =
+        self.cells = list(cells)          
+        self.op = op                     
         self.target = target
 
     def ok(self, vals):
@@ -160,7 +156,7 @@ class Puzzle:
     def __init__(self, n, cages, solution=None):
         self.n = n
         self.cages = cages
-        self.solution = solution          # known answer (only for generated puzzles)
+        self.solution = solution          
         self.cage_of = [[-1] * n for _ in range(n)]
         for k, cg in enumerate(cages):
             for r, c in cg.cells:
@@ -202,7 +198,6 @@ class Puzzle:
         return all(all(row) for row in g) and self.errors(g)[0] == 0
 
 
-# ============================ Puzzle generator & text format ============================
 def generate(n, seed=None):
     rnd = random.Random(seed)
     base = [[(r + c) % n + 1 for c in range(n)] for r in range(n)]   # Latin square
@@ -298,9 +293,6 @@ def from_text(text):
     return Puzzle(n, cages)
 
 
-
-
-# ============================ Algorithms ============================
 
 class Stopped(Exception):
     pass
