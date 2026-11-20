@@ -25,24 +25,38 @@ SAMPLE_PUZZLES = {
         {"op": "=", "target": 6, "cells": [(5,0)]}, {"op": "-", "target": 2, "cells": [(5,1),(5,2)]}, {"op": "-", "target": 1, "cells": [(5,3),(5,4)]}, {"op": "=", "target": 5, "cells": [(5,5)]}]}
 }
 
-def _make_sample(n):
-    cages=[]
-    for r in range(n):
-        c=0
-        while c<n:
-            if c+1<n:
-                a=(r+c)%n+1; b=(r+c+1)%n+1
-                cages.append({"op":"+","target":a+b,"cells":[(r,c),(r,c+1)]}); c+=2
-            else:
-                cages.append({"op":"=","target":(r+c)%n+1,"cells":[(r,c)]}); c+=1
-    return {"n":n,"cages":cages}
-
-SAMPLE_PUZZLES={f"{n}x{n}":_make_sample(n) for n in (4,5,6)}
+# def _make_sample(n):
+#     cages=[]
+#     for r in range(n):
+#         c=0
+#         while c<n:
+#             if c+1<n:
+#                 a=(r+c)%n+1; b=(r+c+1)%n+1
+#                 cages.append({"op":"+","target":a+b,"cells":[(r,c),(r,c+1)]}); c+=2
+#             else:
+#                 cages.append({"op":"=","target":(r+c)%n+1,"cells":[(r,c)]}); c+=1
+#     return {"n":n,"cages":cages}
+#
+# SAMPLE_PUZZLES={f"{n}x{n}":_make_sample(n) for n in (4,5,6,7,8,9)}
 
 def normalize_puzzle(puzzle):
-    p = dict(puzzle); p["n"] = int(p["n"])
-    p["cages"] = [{**c, "cells": [tuple(map(int, x)) for x in c["cells"]]} for c in p["cages"]]
-    validate_puzzle(p); return p
+    normalized_puzzle = dict(puzzle)
+    normalized_puzzle["n"] = int(normalized_puzzle["n"])
+
+    normalized_puzzle["cages"] = [
+        {
+            **cage,
+            "cells": [
+                tuple(map(int, cell))
+                for cell in cage["cells"]
+            ]
+        }
+        for cage in normalized_puzzle["cages"]
+    ]
+
+    validate_puzzle(normalized_puzzle)
+
+    return normalized_puzzle
 
 def validate_puzzle(puzzle):
     n = int(puzzle["n"])
@@ -61,13 +75,20 @@ def validate_puzzle(puzzle):
 def empty_grid(n): return [[0 for _ in range(n)] for _ in range(n)]
 
 def cage_ok(values, op, target):
-    if not values or any(v == 0 for v in values): return True
-    if op == "+": return sum(values) == target
+    if not values or any(v == 0 for v in values): 
+        return True
+    
+    if op == "+": 
+        return sum(values) == target
+    
     if op == "*":
         product = 1
         for v in values: product *= v
         return product == target
-    if op == "-": return len(values) == 2 and abs(values[0]-values[1]) == target
+    
+    if op == "-": 
+        return len(values) == 2 and abs(values[0]-values[1]) == target
+    
     if op == "/":
         return len(values) == 2 and max(values) % min(values) == 0 and max(values)//min(values) == target
     return len(values) == 1 and values[0] == target
@@ -85,19 +106,59 @@ def _cage_possible(values, cage, n):
     if op in ("-", "/"): return missing == 1 and len(values) == 2
     return False
 
-def fitness(grid, puzzle):
-    p=normalize_puzzle(puzzle); n=p["n"]; score=0
-    for row in grid: score += n-len(set(v for v in row if v))
-    for c in range(n): score += n-len(set(grid[r][c] for r in range(n) if grid[r][c]))
-    for cage in p["cages"]:
-        vals=[grid[r][c] for r,c in cage["cells"]]
-        if any(v == 0 for v in vals): score += sum(v == 0 for v in vals)+1
-        elif not cage_ok(vals,cage["op"],cage["target"]): score += 1
+def fitness(grid, puzzle, normalized=False):
+    normalized_puzzle = puzzle if normalized else normalize_puzzle(puzzle)
+    grid_size = normalized_puzzle["n"]
+    score = 0
+
+    valid_values = set(range(1, grid_size + 1))
+
+    for row in grid:
+        score += grid_size - len(set(value for value in row if value))
+        score += len([value for value in row if value not in valid_values])
+
+    for column in range(grid_size):
+        column_values = [grid[row][column] for row in range(grid_size)]
+        score += grid_size - len(set(value for value in column_values if value))
+
+    for cage in normalized_puzzle["cages"]:
+        values = [grid[row][column] for row, column in cage["cells"]]
+
+        if any(value == 0 for value in values):
+            score += sum(value == 0 for value in values) + 1
+
+        elif not cage_ok(values, cage["op"], cage["target"]):
+            score += 1
+
+            if cage["op"] == "+":
+                score += min(abs(sum(values) - cage["target"]), 2 * grid_size) / (2 * grid_size) * 0.5
+
     return score
 
 def is_solved(grid, puzzle):
-    p=normalize_puzzle(puzzle); n=p["n"]
-    return len(grid)==n and all(len(row)==n and set(row)==set(range(1,n+1)) for row in grid) and all({grid[r][c] for r,c in cage["cells"]} and cage_ok([grid[r][c] for r,c in cage["cells"]],cage["op"],cage["target"]) for cage in p["cages"])
+    normalized_puzzle = normalize_puzzle(puzzle)
+    grid_size = normalized_puzzle["n"]
+
+    if len(grid) != grid_size:
+        return False
+
+    if not all(len(row) == grid_size for row in grid):
+        return False
+
+    if not all(set(row) == set(range(1, grid_size + 1)) for row in grid):
+        return False
+
+    for cage in normalized_puzzle["cages"]:
+        values = []
+
+        for cell in cage["cells"]:
+            row, column = cell
+            values.append(grid[row][column])
+
+        if not cage_ok(values, cage["op"], cage["target"]):
+            return False
+
+    return True
 
 def load_puzzle(path):
     with open(path, encoding="utf-8") as f: return normalize_puzzle(json.load(f))
@@ -195,7 +256,13 @@ class Puzzle:
         return count, bad
 
     def is_solved(self, g):
-        return all(all(row) for row in g) and self.errors(g)[0] == 0
+
+        return all(all(row) for row in g) and self.errors(g)[0] == 0 and all({grid[r][c] for r in range(n)} == set(range(1, n+1)) for c in range(n))
+
+    def to_dict(self):
+        return {"n": self.n,
+                "cages": [{"op": c.op, "target": c.target,
+                           "cells": [list(x) for x in c.cells]} for c in self.cages]}
 
 
 def generate(n, seed=None):
