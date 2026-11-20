@@ -13,7 +13,7 @@ from genetic import init_population, crossover, mutate
 
 # Simulated Annealing Local Search
 def local_search(grid, normalized_puzzle, fitness_function,
-                 steps=200, temperature=0.15):
+                 steps=200, temperature=0.3):
 
     grid_size = normalized_puzzle["n"]
     current_fitness = fitness_function(grid)
@@ -47,7 +47,7 @@ def local_search(grid, normalized_puzzle, fitness_function,
 
 
 def solve(puzzle, on_step=None, time_limit=60, population_size=20,
-          mutation_rate=0.3, elite=4, ls_steps=600, stall_limit=40):
+          mutation_rate=0.3, elite=2, ls_steps=600, stall_limit=40):
 
     normalized_puzzle = normalize_puzzle(puzzle)
     start = time.perf_counter()
